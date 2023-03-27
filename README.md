@@ -1,7 +1,7 @@
 # Sequence Menu
 A sequence menu for the Blender Video Sequence Editor which includes all file operations and a File Browser for exporting.
 
-## Included
+## Features
 * Add Sequencer menu
 * Colleced VSE file operations.
 * Add Export menu.
@@ -11,7 +11,7 @@ A sequence menu for the Blender Video Sequence Editor which includes all file op
 * Import multiple images as image strip(not image sequence).
 * Etc.
 
-![vse_export](https://user-images.githubusercontent.com/1322593/227878229-b0194ba7-8fd6-4749-be21-57f585eb5fb3.gif)
+https://user-images.githubusercontent.com/1322593/227909044-2dc394a1-57f8-406e-a46e-a92d1a58c50f.mp4
 
 ## Acknowledgements
 
