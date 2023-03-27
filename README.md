@@ -1,7 +1,7 @@
 # Sequence Menu
 A sequence menu for the Blender Video Sequence Editor which includes all file operations and a File Browser for exporting.
 
-"" Included
+## Included
 * Add Sequencer menu
 * Colleced VSE file operations.
 * Add Export menu.
