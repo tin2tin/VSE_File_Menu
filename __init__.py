@@ -35,8 +35,8 @@ def export_file(context, filepath):
     return {"FINISHED"}
 
 
-class SEQUENCER_PT_export_folder_browser(Operator, ExportHelper):
-    """Export animation"""
+class SEQUENCER_PT_export_browser(Operator, ExportHelper):
+    """Export the sequence with audio"""
 
     bl_idname = "sequencer.export"
     bl_label = "Export"
@@ -44,13 +44,22 @@ class SEQUENCER_PT_export_folder_browser(Operator, ExportHelper):
     # use_filter_folder = True
     use_filter_movie = True
     use_filter_image = True
-    filter_glob: StringProperty(default="", options={"HIDDEN"}, maxlen=255)
+    #filter_glob: StringProperty(default="", options={"HIDDEN"}, maxlen=255)
+    auto_range:  bpy.props.BoolProperty(name='Auto Range', description='Set the range to include the imported strips', default=True)
 
     def execute(self, context):
+        
+        if self.auto_range:
+            selection = bpy.context.selected_sequences
+            bpy.ops.sequencer.select_all(action='SELECT')
+            bpy.ops.sequencer.set_range_to_strips()
+            bpy.ops.sequencer.select_all(action='DESELECT')
+            for s in selection: s.select = True
+        
         return export_file(context, self.filepath)
 
-    def draw(self, context):
-        pass
+#    def draw(self, context):
+#        pass
 
 
 class SEQUENCER_PT_export(bpy.types.Panel):
@@ -238,14 +247,46 @@ def menu_func_export(self, context):
     )
 
 
-# Class by Meta Person https://github.com/metaperson/blender_vse/blob/main/tube/20210924%231/addon_import_strips.py
+def find_first_empty_channel(start_frame, end_frame):
+    for ch in range(1, len(bpy.context.scene.sequence_editor.sequences_all) + 1):
+        for seq in bpy.context.scene.sequence_editor.sequences_all:
+            if (
+                seq.channel == ch
+                and seq.frame_final_start < end_frame
+                and seq.frame_final_end > start_frame
+            ):
+                break
+        else:
+            return ch
+    return 1
+
+
+# Class started by Meta Person: https://github.com/metaperson/blender_vse/blob/main/tube/20210924%231/addon_import_strips.py
 class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
-    bl_description = 'import strips'
+    bl_description = 'Import multiple strips of mixed types'
     bl_idname = 'sequencer.import_strips'
     bl_label = 'Import'
 
     files: bpy.props.CollectionProperty(name='Import Strips', type=bpy.types.OperatorFileListElement)
 
+    insert_method: bpy.props.EnumProperty(name='Insert Method',
+                description='Insert method',
+                items=[('PLAYHEAD',          'Playhead',         'Insert at playhead position'),
+                       ('APPEND',         'Append',        'Append strips to the end of sequence')],
+                 default='PLAYHEAD')
+
+    channel: bpy.props.IntProperty(name='Import Channel', description='Assign channel to put strips', default=1, min=1)
+
+    relative_path: bpy.props.BoolProperty(name='Relative Path', description='Use a relative path', default=True)
+
+    fit_method: bpy.props.EnumProperty(name='Scale',
+                description='Scale fit method',
+                items=[('FIT',          'Scale to Fit',         'Scale image to fit within the canvas'),
+                       ('FILL',         'Scale to Fill',        'Scale image to completely fill the canvas'),
+                       ('STRETCH',      'Stretch to Fill',      'Stretch image to fill the canvas'),
+                       ('ORIGINAL',     'Use Original Size',    'Keep image at its original size')],
+                default='FIT')
+    
     order_by: bpy.props.EnumProperty(name='Import Order',
                 description='Strips are sorted by this order',
                 items=[('PICK',         'Pick',                 'No Sort, as selected order'),
@@ -254,20 +295,23 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
                        ('FILE_SIZE',    'File Size',            'Sort order by the file size')],
                 default='FILE_NAME')
 
-    reversed_order: bpy.props.BoolProperty(name='Reversed order', description='Reversed order for sorting', default=False)
-    
-    channel: bpy.props.IntProperty(name='Channel', description='Assign channel to put strips', default=1, min=1)
+    reversed_order: bpy.props.BoolProperty(name='Reversed Order', description='Reversed order for sorting', default=False)
 
     image_strip_length: bpy.props.IntProperty(name='Image Duration', description='Image strip length', default=25, min=1)
-    
-    fit_method: bpy.props.EnumProperty(name='Scale',
-                description='Scale fit method',
-                items=[('FIT',          'Scale to Fit',         'Scale image to fit within the canvas'),
-                       ('FILL',         'Scale to Fill',        'Scale image to completely fill the canvas'),
-                       ('STRETCH',      'Stretch to Fill',      'Stretch image to fill the canvas'),
-                       ('ORIGINAL',     'Use Original Size',    'Keep image at its original size')],
-                default='FIT')
 
+    use_placeholders: bpy.props.BoolProperty(name='Image Placeholders', description='Use placeholders for missing images', default=True)
+
+    adjust_playback_rate: bpy.props.BoolProperty(name='Auto Frame Rate', description='Play at normal speed regardless of scene FPS', default=True)
+
+    use_framerate: bpy.props.BoolProperty(name='Override Frame Rate', description='Set the scene frame rate according to framerate of Movie strip', default=True)
+
+    set_view_transform: bpy.props.BoolProperty(name='Override Color Space', description='Set the scene colorspace view transform according to strip', default=True)
+
+    add_sound: bpy.props.BoolProperty(name='Import Sound', description='Import sound for Movie strips', default=True)
+    mono: bpy.props.BoolProperty(name='Mix to Mono', description='Mix sound channels to mono', default=False)
+    cache: bpy.props.BoolProperty(name='Cache Sound', description='Cache the sound of Sound strips', default=False)
+    
+    auto_range:  bpy.props.BoolProperty(name='Auto Range', description='Set the range to include the imported strips', default=True)
 
     @classmethod
     def poll(cls, context):
@@ -311,64 +355,77 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
         count_sound = 0
         count_image = 0
         
+        imported_strips = []
+        new_strip = ""     
+        empty_channel = find_first_empty_channel(0, 10000000000)
         for strip_file in strip_files:
             strip_ext = os.path.splitext(strip_file.name)[1].lower()
             # print(strip_dirname, strip_file.name, strip_ext)
-            frame_start = max([seq.frame_final_end for seq in context.sequences] or [0])
+            if self.insert_method == "APPEND":
+                frame_start = max([seq.frame_final_end for seq in context.sequences] or [0])
+                channel = self.channel
+            elif self.insert_method == "PLAYHEAD":
+                if any(seq.frame_final_end for seq in imported_strips):
+                    frame_start = max([seq.frame_final_end for seq in imported_strips] or [context.scene.frame_current])
+                    channel = max(self.channel, empty_channel) 
+                else:
+                    frame_start = context.scene.frame_current
+                    channel = self.channel
+                
             if strip_ext in ('.avi', '.mp4', '.mpg', '.mpeg', '.mov', '.mkv', '.dv', '.flv'):
                 strip_path = os.path.join(strip_dirname, strip_file.name)
                 bpy.ops.sequencer.movie_strip_add(filepath=strip_path,
                                                   frame_start=frame_start,
-                                                  channel=self.channel,
-                                                  fit_method=self.fit_method)
+                                                  channel=channel,
+                                                  fit_method=self.fit_method,
+                                                  set_view_transform=self.set_view_transform,
+                                                  adjust_playback_rate=self.adjust_playback_rate,
+                                                  sound=self.add_sound,
+                                                  use_framerate = self.use_framerate,
+                                                  relative_path=self.relative_path,
+                                                  )
                 count_movie += 1
+                new_strip = context.scene.sequence_editor.active_strip
             elif strip_ext in ('.acc', '.ac3', '.flac', '.mp2', '.mp3', '.m4a','.pcm', '.ogg'):
                 strip_path = os.path.join(strip_dirname, strip_file.name)
                 bpy.ops.sequencer.sound_strip_add(filepath=strip_path,
                                                   frame_start=frame_start,
-                                                  channel=self.channel)
+                                                  channel=channel,
+                                                  cache=self.cache,
+                                                  mono=self.mono,
+                                                  relative_path=self.relative_path,
+                                                  )
                 count_sound += 1
+                new_strip = context.scene.sequence_editor.active_strip
             elif strip_ext in ('.jpg', '.jpeg', '.bmp', '.png', '.gif', '.tga', '.tiff'):
                 bpy.ops.sequencer.image_strip_add(directory=strip_dirname + '\\', files=[{"name":strip_file.name, "name":strip_file.name}],
                                                   show_multiview=False,
                                                   frame_start=frame_start, frame_end=frame_start+self.image_strip_length,
-                                                  channel=self.channel,
-                                                  fit_method=self.fit_method)
+                                                  channel=channel,
+                                                  fit_method=self.fit_method,
+                                                  set_view_transform=self.set_view_transform,
+                                                  use_placeholders=self.use_placeholders,
+                                                  relative_path=self.relative_path,
+                                                  )
                 count_image += 1
+                new_strip = context.scene.sequence_editor.active_strip
+            if new_strip != "":
+                imported_strips.append(new_strip)
+                new_strip = ""
+                
+        if self.auto_range:
+            selection = bpy.context.selected_sequences
+            bpy.ops.sequencer.select_all(action='SELECT')
+            bpy.ops.sequencer.set_range_to_strips()
+            bpy.ops.sequencer.select_all(action='DESELECT')
+            for s in selection: s.select = True  
                                                   
         self.report({'INFO'}, 'Imported Movie[{}], Sound[{}], Image[{}], Total[{}]'.format(count_movie,
                                                                                            count_sound,
                                                                                            count_image,
                                                                                            count_movie + count_sound + count_image))
 
-
         return {'FINISHED'}
-    
-#    def draw(self, context):
-#        layout = self.layout()
-#        layout.label("hej")
-#        #layout.operator("SEQUENCER_OT_sound_strip_add", text="Cache")
-        
-
-#class SEQUENCER_PT_import(bpy.types.Panel):
-#    bl_space_type = "FILE_BROWSER"
-#    bl_region_type = "TOOL_PROPS"
-#    bl_label = "Import Options"
-#    bl_parent_id = "FILE_PT_operator"
-
-#    @classmethod
-#    def poll(cls, context):
-#        sfile = context.space_data
-#        operator = sfile.active_operator
-#        return operator.bl_idname == "SEQUENCER_OT_import_strips"
-
-#    def invoke(self, context, event):
-#        context.scene.render.use_sequencer = True
-
-#    def draw(self, context):
-#        layout = self.layout()
-#        layout.operator("SEQUENCER_OT_sound_strip_add.cache", text="Cache")
-#        pass
 
 
 class SEQUENCER_MT_sequence(bpy.types.Menu):
@@ -383,18 +440,15 @@ class SEQUENCER_MT_sequence(bpy.types.Menu):
         layout.operator_context = "INVOKE_DEFAULT"
 
         layout.separator()
-        layout.operator("sequencer.import_strips", text="Import")
-
-        props = layout.operator("sequencer.export", text="Export")
+        layout.operator("sequencer.import_strips", text="Import Media")
 
         layout.separator()
-        layout.operator("render.opengl", text="Render Image").sequencer = True
-
-        layout.separator()
-        layout.operator("sound.mixdown", text="Export Audio Mixdown")
-
-        layout.separator()
+        props = layout.operator("sequencer.export", text="Export Sequence")
+        layout.operator("sound.mixdown", text="Export Audio")
         layout.operator("sequencer.export_subtitles", text="Export Subtitles")
+
+        layout.separator()
+        layout.operator("render.opengl", text="Render Frame").sequencer = True
 
 
 def prepend_sequence_menu(self, context):
@@ -411,9 +465,8 @@ classes = (
     SEQUENCER_PT_export_frame_range,
     SEQUENCER_PT_export_time_stretching,
     SEQUENCER_PT_export_post_processing,
-    SEQUENCER_PT_export_folder_browser,
+    SEQUENCER_PT_export_browser,
     SEQUENCER_OT_import_strips,
-    #SEQUENCER_PT_import,
     SEQUENCER_MT_sequence,
 )
 
@@ -436,4 +489,4 @@ if __name__ == "__main__":
     register()
 
     # test call
-    # bpy.ops.sequencer.export('INVOKE_DEFAULT')
+    #bpy.ops.sequencer.export('INVOKE_DEFAULT')
