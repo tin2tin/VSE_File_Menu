@@ -9,6 +9,8 @@ A sequence menu for the Blender Video Sequence Editor which includes all file op
 * Import sorting.
 * Import into channel.
 * Import multiple images as image strip(not image sequence).
+* Playhead and append insert methods.
+* All the default import options and more.
 * Etc.
 
 https://user-images.githubusercontent.com/1322593/227909044-2dc394a1-57f8-406e-a46e-a92d1a58c50f.mp4
