@@ -11,6 +11,7 @@ Power charge your file import & export for the Blender Video Sequence Editor
 * Import into channel.
 * Playhead and append insert methods.
 * All the default import options and more.
+* Import text as Text strip.
 * Etc.
 
 https://user-images.githubusercontent.com/1322593/227909044-2dc394a1-57f8-406e-a46e-a92d1a58c50f.mp4
