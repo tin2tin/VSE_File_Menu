@@ -353,13 +353,13 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
 
     files: bpy.props.CollectionProperty(name='Import Strips', type=bpy.types.OperatorFileListElement)
 
-    insert_method: bpy.props.EnumProperty(name='Insert Method',
+    insert_method: bpy.props.EnumProperty(name='Insert Position',
                 description='Insert method',
                 items=[('PLAYHEAD',          'Playhead',         'Insert at playhead position'),
                        ('APPEND',         'Append',        'Append strips to the end of sequence')],
                  default='PLAYHEAD')
 
-    channel: bpy.props.IntProperty(name='Import Channel', description='Assign channel to put strips', default=1, min=1)
+    channel: bpy.props.IntProperty(name='Channel', description='Assign channel to put strips', default=1, min=1)
 
     relative_path: bpy.props.BoolProperty(name='Relative Path', description='Use a relative path', default=False)
 
@@ -385,17 +385,17 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
 
     use_placeholders: bpy.props.BoolProperty(name='Image Placeholders', description='Use placeholders for missing images', default=True)
 
-    adjust_playback_rate: bpy.props.BoolProperty(name='Auto Frame Rate', description='Play at normal speed regardless of scene FPS', default=True)
+    adjust_playback_rate: bpy.props.BoolProperty(name='Adjust Strip FPS', description='Play at normal speed regardless of scene FPS', default=True)
 
-    use_framerate: bpy.props.BoolProperty(name='Override Frame Rate', description='Set the scene frame rate according to framerate of Movie strip', default=True)
+    use_framerate: bpy.props.BoolProperty(name='Override Scene FPS', description='Set the scene frame rate according to framerate of Movie strip', default=True)
 
-    set_view_transform: bpy.props.BoolProperty(name='Override Color Space', description='Set the scene colorspace view transform according to strip', default=True)
+    set_view_transform: bpy.props.BoolProperty(name='Scene Color Space', description='Set the scene colorspace view transform according to strip', default=True)
 
     add_sound: bpy.props.BoolProperty(name='Import Sound', description='Import sound for Movie strips', default=True)
     mono: bpy.props.BoolProperty(name='Mix to Mono', description='Mix sound channels to mono', default=False)
     cache: bpy.props.BoolProperty(name='Cache Sound', description='Cache the sound of Sound strips', default=False)
     
-    auto_range:  bpy.props.BoolProperty(name='Auto Range', description='Set the range to include the imported strips', default=True)
+    auto_range:  bpy.props.BoolProperty(name='Adjust Range', description='Set the range to include the imported strips', default=True)
 
     filter_glob: StringProperty(default=valid_extensions_str, options={"HIDDEN"}, maxlen=255)
 
@@ -418,34 +418,6 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
         if not self.relative_path:
             strip_dirname = os.path.abspath(strip_dirname)
         strip_files = self.files
-
-#        for strip_file in strip_files:
-#            print(str(strip_file))
-
-#        If there is a way select folders use this code to go through all sub-folders.
-#        file_list = []
-#        # Loop through each selected file or folder
-#        for path in strip_files:
-#            # Check if the path is a directory
-#            if os.path.isdir(path):
-#                # If it is a directory, recursively add all files in the directory to the file_list
-#                for root, dirs, files in os.walk(path):
-#                    for file in files:
-#                        file_list.append(os.path.join(root, file))
-#            else:
-#                # If it is a file, add it to the file_list
-#                file_list.append(path)
-#        strip_files.extend(file_list)
-
-#        # Loop over the files and remove any that don't have a valid extension
-#        for file_path in strip_files:
-#            # Get the file's extension
-#            file_extension = os.path.splitext(strip_file.name)[1].lower()
-#            
-#            # Check if the extension is in the array of valid extensions
-#            if file_extension not in valid_extensions:
-#                # Remove the file from the list of files to check
-#                strip_files.remove(file_path)
 
         if self.order_by == 'PICK':
             if self.reversed_order:
@@ -552,6 +524,72 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
 
         return {'FINISHED'}
 
+    def draw(self, context):
+        pass
+
+
+class SEQUENCER_PT_import_strips(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Import"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "SEQUENCER_OT_import_strips"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        # General
+        box = layout.box()
+        box = box.column(align=True)
+        box.prop(operator, "insert_method")
+        box.prop(operator, "channel")
+        box.prop(operator, "relative_path")
+        box.prop(operator, "auto_range")
+
+        box = layout.box()
+        box = box.column(align=True)      
+        box.prop(operator, "order_by")
+        box.prop(operator, "reversed_order")
+        
+        box = layout.box()
+        box = box.column(align=True)
+        box.prop(operator, "fit_method")
+        row = box.row(align=True, heading="Override")
+        row.prop(operator, "set_view_transform")
+
+        # Video
+        box = layout.box()
+        box = box.column(align=True)
+        box.label(text="Movie", icon="FILE_MOVIE")
+        box.prop(operator, "adjust_playback_rate")
+        box.prop(operator, "use_framerate")
+        box.prop(operator, "add_sound")
+
+        # Image
+        box = layout.box()
+        box = box.column(align=True)
+        box.label(text="Image/Sequence", icon="IMAGE_DATA")
+        box.prop(operator, "image_strip_length")
+        box.prop(operator, "use_placeholders")
+        
+        # Sound
+        box = layout.box()
+        box = box.column(align=True)
+        box.label(text="Sound", icon="FILE_SOUND")
+        box.prop(operator, "mono")
+        box.prop(operator, "cache")        
+
 
 class SEQUENCER_MT_sequence(bpy.types.Menu):
     bl_idname = "SEQUENCER_MT_sequence"
@@ -592,6 +630,7 @@ classes = (
     SEQUENCER_PT_export_post_processing,
     SEQUENCER_PT_export_browser,
     SEQUENCER_OT_import_strips,
+    SEQUENCER_PT_import_strips,
     SEQUENCER_MT_sequence,
 )
 
