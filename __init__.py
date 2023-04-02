@@ -26,6 +26,90 @@ from bl_ui.properties_output import RENDER_PT_post_processing
 from bl_ui.properties_output import RENDER_PT_output_color_management
 from bl_ui.properties_output import RENDER_PT_output_views
 
+audio_extensions = [
+    ".wav",
+    ".ogg",
+    ".oga",
+    ".mp3",
+    ".mp2",
+    ".ac3",
+    ".aac",
+    ".flac",
+    ".wma",
+    ".eac3",
+    ".aif",
+    ".aiff",
+    ".m4a",
+    ".mka"
+]
+
+image_extensions = [
+    ".png",
+    ".tga",
+    ".bmp",
+    ".jpg",
+    ".jpeg",
+    ".sgi",
+    ".rgb",
+    ".rgba",
+    ".tif",
+    ".tiff",
+    ".tx",
+    ".jp2",
+    ".j2c",
+    ".hdr",
+    ".dds",
+    ".dpx",
+    ".cin",
+    ".exr",
+    ".psd",
+    ".pdd",
+    ".psb",
+    ".webp",
+    ".psd",
+    ".pdd",
+    ".psb"
+]
+
+video_extensions = [
+    ".avi",
+    ".flc",
+    ".mov",
+    ".movie",
+    ".mp4",
+    ".m4v",
+    ".m2v",
+    ".m2t",
+    ".m2ts",
+    ".mts",
+    ".ts",
+    ".mv",
+    ".avs",
+    ".wmv",
+    ".ogv",
+    #".ogg",
+    ".r3d",
+    ".dv",
+    ".mpeg",
+    ".mpg",
+    ".mpg2",
+    ".vob",
+    ".mkv",
+    ".flv",
+    ".divx",
+    ".xvid",
+    ".mxf",
+    ".gif",
+    ".webm"
+]
+
+text_extensions = [
+    ".txt",
+]
+
+valid_extensions = image_extensions+video_extensions+audio_extensions+text_extensions
+delimiter = ";*"
+valid_extensions_str = delimiter.join(valid_extensions)
 
 def export_file(context, filepath):
     dirname = os.path.dirname(filepath)
@@ -44,7 +128,7 @@ class SEQUENCER_PT_export_browser(Operator, ExportHelper):
     # use_filter_folder = True
     use_filter_movie = True
     use_filter_image = True
-    #filter_glob: StringProperty(default="", options={"HIDDEN"}, maxlen=255)
+    filter_glob: StringProperty(default=valid_extensions_str, options={"HIDDEN"}, maxlen=255)
     auto_range:  bpy.props.BoolProperty(name='Auto Range', description='Set the range to include the imported strips', default=True)
 
     def execute(self, context):
@@ -277,7 +361,7 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
 
     channel: bpy.props.IntProperty(name='Import Channel', description='Assign channel to put strips', default=1, min=1)
 
-    relative_path: bpy.props.BoolProperty(name='Relative Path', description='Use a relative path', default=True)
+    relative_path: bpy.props.BoolProperty(name='Relative Path', description='Use a relative path', default=False)
 
     fit_method: bpy.props.EnumProperty(name='Scale',
                 description='Scale fit method',
@@ -313,6 +397,8 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
     
     auto_range:  bpy.props.BoolProperty(name='Auto Range', description='Set the range to include the imported strips', default=True)
 
+    filter_glob: StringProperty(default=valid_extensions_str, options={"HIDDEN"}, maxlen=255)
+
     @classmethod
     def poll(cls, context):
         if not bpy.ops.sequencer.movie_strip_add.poll():
@@ -325,14 +411,41 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
 
     def execute(self, context):
         #print('ImportHelper.files : {}'.format(self.files))
-        #print('file path : {}'.format(self.filepath))
+        print('file path : {}'.format(self.filepath))
         #print('Sort by order : {}'.format(self.order_by))
         
         strip_dirname = os.path.dirname(self.filepath)
+        if not self.relative_path:
+            strip_dirname = os.path.abspath(strip_dirname)
         strip_files = self.files
 
-        #for strip_file in strip_files:
-        #    print(strip_file)
+#        for strip_file in strip_files:
+#            print(str(strip_file))
+
+#        If there is a way select folders use this code to go through all sub-folders.
+#        file_list = []
+#        # Loop through each selected file or folder
+#        for path in strip_files:
+#            # Check if the path is a directory
+#            if os.path.isdir(path):
+#                # If it is a directory, recursively add all files in the directory to the file_list
+#                for root, dirs, files in os.walk(path):
+#                    for file in files:
+#                        file_list.append(os.path.join(root, file))
+#            else:
+#                # If it is a file, add it to the file_list
+#                file_list.append(path)
+#        strip_files.extend(file_list)
+
+#        # Loop over the files and remove any that don't have a valid extension
+#        for file_path in strip_files:
+#            # Get the file's extension
+#            file_extension = os.path.splitext(strip_file.name)[1].lower()
+#            
+#            # Check if the extension is in the array of valid extensions
+#            if file_extension not in valid_extensions:
+#                # Remove the file from the list of files to check
+#                strip_files.remove(file_path)
 
         if self.order_by == 'PICK':
             if self.reversed_order:
@@ -348,12 +461,13 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
         else:
             return {'CANCELLED'}
 
-        # for strip_file in strip_files:
-        #     print(strip_file)
+#        for strip_file in strip_files:
+#            print(strip_file)
 
         count_movie = 0
         count_sound = 0
         count_image = 0
+        count_text = 0
         
         imported_strips = []
         new_strip = ""     
@@ -372,7 +486,7 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
                     frame_start = context.scene.frame_current
                     channel = self.channel
                 
-            if strip_ext in ('.avi', '.mp4', '.mpg', '.mpeg', '.mov', '.mkv', '.dv', '.flv'):
+            if strip_ext in video_extensions:
                 strip_path = os.path.join(strip_dirname, strip_file.name)
                 bpy.ops.sequencer.movie_strip_add(filepath=strip_path,
                                                   frame_start=frame_start,
@@ -386,7 +500,7 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
                                                   )
                 count_movie += 1
                 new_strip = context.scene.sequence_editor.active_strip
-            elif strip_ext in ('.acc', '.ac3', '.flac', '.mp2', '.mp3', '.m4a','.pcm', '.ogg'):
+            elif strip_ext in audio_extensions:
                 strip_path = os.path.join(strip_dirname, strip_file.name)
                 bpy.ops.sequencer.sound_strip_add(filepath=strip_path,
                                                   frame_start=frame_start,
@@ -397,7 +511,7 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
                                                   )
                 count_sound += 1
                 new_strip = context.scene.sequence_editor.active_strip
-            elif strip_ext in ('.jpg', '.jpeg', '.bmp', '.png', '.gif', '.tga', '.tiff'):
+            elif strip_ext in image_extensions:
                 bpy.ops.sequencer.image_strip_add(directory=strip_dirname + '\\', files=[{"name":strip_file.name, "name":strip_file.name}],
                                                   show_multiview=False,
                                                   frame_start=frame_start, frame_end=frame_start+self.image_strip_length,
@@ -409,6 +523,16 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
                                                   )
                 count_image += 1
                 new_strip = context.scene.sequence_editor.active_strip
+            elif strip_ext in text_extensions:
+                bpy.ops.sequencer.effect_strip_add(type='TEXT',
+                                                  frame_start=frame_start, frame_end=frame_start+self.image_strip_length,
+                                                  channel=channel,
+                                                  )
+                count_text += 1
+                new_strip = context.scene.sequence_editor.active_strip
+                with open(os.path.join(strip_dirname, strip_file.name)) as f:
+                    content = f.read()
+                new_strip.text = content
             if new_strip != "":
                 imported_strips.append(new_strip)
                 new_strip = ""
@@ -420,10 +544,11 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
             bpy.ops.sequencer.select_all(action='DESELECT')
             for s in selection: s.select = True  
                                                   
-        self.report({'INFO'}, 'Imported Movie[{}], Sound[{}], Image[{}], Total[{}]'.format(count_movie,
+        self.report({'INFO'}, 'Imported Movie[{}], Sound[{}], Image[{}], Text[{}], Total[{}]'.format(count_movie,
                                                                                            count_sound,
                                                                                            count_image,
-                                                                                           count_movie + count_sound + count_image))
+                                                                                           count_text,
+                                                                                           count_movie + count_sound + count_image + count_image))
 
         return {'FINISHED'}
 
