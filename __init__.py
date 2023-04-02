@@ -545,6 +545,8 @@ class SEQUENCER_PT_import_strips(bpy.types.Panel):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False  # No animation.
+        prefs = context.preferences
+        system = prefs.system
 
         sfile = context.space_data
         operator = sfile.active_operator
@@ -556,13 +558,15 @@ class SEQUENCER_PT_import_strips(bpy.types.Panel):
         box.prop(operator, "channel")
         box.prop(operator, "relative_path")
         box.prop(operator, "auto_range")
+        box.separator()
 
-        box = layout.box()
+        #box = layout.box()
         box = box.column(align=True)      
         box.prop(operator, "order_by")
         box.prop(operator, "reversed_order")
-        
-        box = layout.box()
+        box.separator()
+
+        #box = layout.box()
         box = box.column(align=True)
         box.prop(operator, "fit_method")
         row = box.row(align=True, heading="Override")
@@ -572,6 +576,7 @@ class SEQUENCER_PT_import_strips(bpy.types.Panel):
         box = layout.box()
         box = box.column(align=True)
         box.label(text="Movie", icon="FILE_MOVIE")
+        box.prop(system, "sequencer_proxy_setup")
         box.prop(operator, "adjust_playback_rate")
         box.prop(operator, "use_framerate")
         box.prop(operator, "add_sound")
