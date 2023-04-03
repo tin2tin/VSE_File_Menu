@@ -1,4 +1,4 @@
-# Blender Video Editor Import, Export & Sequence Menu
+# Enhanced Blender VSE Import, Export & Sequence Menu
 Enhanced UX and features for the file import and export of the Blender Video Sequence Editor
 
 ## Features
