@@ -537,7 +537,14 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
 
         return {'FINISHED'}
 
-    def draw(self, context):
+        set_default_filter_settings: bool = True
+        def draw(self, context):
+            if self.set_default_filter_settings:
+                context.space_data.params.use_filter = True        # enable Filter
+                context.space_data.params.use_filter_movie = True  # set movie filter as default
+                context.space_data.params.use_filter_image = True  # set movie filter as default
+                context.space_data.params.use_filter_sound = True  # set movie filter as default
+                self.set_default_filter_settings = False
         pass
 
 
@@ -554,7 +561,14 @@ class SEQUENCER_PT_import_strips(bpy.types.Panel):
 
         return operator.bl_idname == "SEQUENCER_OT_import_strips"
 
+    set_default_filter_settings: bool = True
     def draw(self, context):
+        if self.set_default_filter_settings:
+            context.space_data.params.use_filter = True        # enable Filter
+            context.space_data.params.use_filter_movie = True  # set movie filter as default
+            context.space_data.params.use_filter_image = True  # set movie filter as default
+            context.space_data.params.use_filter_sound = True  # set movie filter as default
+            self.set_default_filter_settings = False
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False  # No animation.
@@ -663,7 +677,7 @@ def register():
 
 def unregister():
     for cls in classes:
-        bpy.utils.register_class(cls)
+        bpy.utils.unregister_class(cls)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
     bpy.types.SEQUENCER_MT_editor_menus.remove(prepend_sequence_menu)
 
