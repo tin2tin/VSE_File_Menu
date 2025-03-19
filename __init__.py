@@ -327,9 +327,10 @@ class SEQUENCER_PT_export_post_processing(bpy.types.Panel):
 
 
 def menu_func_export(self, context):
-    self.layout.operator(
-        SEQUENCER_PT_export_frame_range.bl_idname, text="Sequencer Export"
-    )
+#    self.layout.operator(
+#        SEQUENCER_PT_export_frame_range.bl_idname, text="Sequencer Export"
+#    )
+    self.layout.operator("sequencer.export", text="Sequencer Export")
 
 
 def find_first_empty_channel(start_frame, end_frame):
@@ -492,10 +493,10 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
                 count_sound += 1
                 new_strip = context.scene.sequence_editor.active_strip
             elif strip_ext in image_extensions:
-
                 bpy.ops.sequencer.image_strip_add(directory=strip_dirname + '\\', files=[{"name":strip_file.name}],
                                                   show_multiview=False,
-                                                  frame_start=frame_start, frame_end=frame_start+self.image_strip_length,
+                                                  frame_start=frame_start,
+                                                  frame_end=frame_start+self.image_strip_length,
                                                   channel=channel,
                                                   fit_method=self.fit_method,
                                                   set_view_transform=self.set_view_transform,
@@ -505,14 +506,16 @@ class SEQUENCER_OT_import_strips(bpy.types.Operator, ImportHelper):
                                                   )               
                 count_image += 1
                 new_strip = context.scene.sequence_editor.active_strip
+                new_strip.frame_final_duration = self.image_strip_length
             elif strip_ext in text_extensions:
                 bpy.ops.sequencer.effect_strip_add(type='TEXT',
                                                   frame_start=frame_start,
-                                                  frame_end=frame_start+400,
+                                                  frame_end=frame_start+self.image_strip_length,
                                                   channel=channel,
                                                   )
                 count_text += 1
                 new_strip = context.scene.sequence_editor.active_strip
+                new_strip.frame_final_duration = self.image_strip_length
                 strip_path = os.path.join(strip_dirname, strip_file.name)
                 strip_path = os.path.abspath(strip_path)
                 with open(strip_path) as f:
@@ -613,7 +616,7 @@ class SEQUENCER_PT_import_strips(bpy.types.Panel):
         box = box.column(align=True)
         box.label(text="Image/Sequence", icon="IMAGE_DATA")
         box.prop(operator, "image_strip_length")
-        box.prop(operator, "use_sequence")
+        #box.prop(operator, "use_sequence")
         box.prop(operator, "use_placeholders")
         
         # Sound
